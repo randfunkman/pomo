@@ -1,0 +1,18 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import 'tailwindcss';
+
+@layer base {
+	body {
+		font-family: 'Inter', sans-serif;
+		overscroll-behavior: none; /* Prevents pull-to-refresh issues on mobile for drag-and-drop */
+	}
+	/* Style for HTML5 drag operations */
+	.dragging {
+		opacity: 0.5;
+		border: 2px dashed #cbd5e1; /* Tailwind slate-300 */
+	}
+	.drag-over-group {
+		outline: 2px dashed #3b82f6; /* Tailwind blue-500 */
+		outline-offset: 4px;
+	}
+}
