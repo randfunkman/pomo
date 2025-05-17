@@ -145,6 +145,24 @@
 		});
 	}
 
+	function handleUpdateTask(taskId: string, newDescription: string, newMinutes: number): void {
+		tasks = tasks.map((task) => {
+			if (task.id === taskId) {
+				// If the task was completed and minutes change, adjust break bank
+				// This logic assumes that if a completed task's value changes,
+				// the bank should reflect that change retroactively.
+				// This might need refinement based on desired behavior.
+				if (task.completed) {
+					const diff = newMinutes - task.minutes;
+					breakBank = Math.max(0, breakBank + diff);
+				}
+				return { ...task, description: newDescription, minutes: newMinutes };
+			}
+			return task;
+		});
+		// No reordering is needed as only content changes, not group or completion status affecting order.
+	}
+
 	function renumberTasksInGroup(groupId: string): void {
 		let orderCounter = 0;
 		tasks = tasks
@@ -201,51 +219,50 @@
 
 	function handleDropOnTaskItem(event: DragEvent, targetTaskId: string): void {
 		event.preventDefault();
-		event.stopPropagation(); // Prevent bubbling to group's drop handler
-
+		event.stopPropagation(); // Prevent event from bubbling to parent group's drop handler
 		const taskIdToMove = event.dataTransfer?.getData('text/plain');
-		if (!taskIdToMove || taskIdToMove === draggedTaskId) {
+
+		if (taskIdToMove && taskIdToMove === draggedTaskId && taskIdToMove !== targetTaskId) {
 			const draggedTaskIndex = tasks.findIndex((t) => t.id === taskIdToMove);
 			const targetTaskIndex = tasks.findIndex((t) => t.id === targetTaskId);
 
-			if (draggedTaskIndex > -1 && targetTaskIndex > -1 && taskIdToMove !== targetTaskId) {
-				const dragged = tasks[draggedTaskIndex];
-				const target = tasks[targetTaskIndex];
-				const originalGroupId = dragged.groupId;
-				const targetGroupId = target.groupId;
+			if (draggedTaskIndex > -1 && targetTaskIndex > -1) {
+				const draggedTaskCopy = { ...tasks[draggedTaskIndex] }; // Create a copy to modify
+				const targetTaskRef = tasks[targetTaskIndex]; // Reference to the target task
 
-				// Update group if different
-				dragged.groupId = targetGroupId;
+				const originalGroupId = draggedTaskCopy.groupId;
+				const newGroupId = targetTaskRef.groupId; // Group ID for the dragged task
 
-				// Reordering logic: insert dragged task before target task
-				const tasksInTargetGroup = tasks
-					.filter((t) => t.groupId === targetGroupId && t.id !== taskIdToMove)
-					.sort((a, b) => a.order - b.order);
+				// Update the dragged task's group ID
+				draggedTaskCopy.groupId = newGroupId;
 
-				const insertionPoint = tasksInTargetGroup.findIndex((t) => t.id === targetTaskId);
+				// Set a temporary "hint" for the order.
+				// This places the dragged task just before the target task.
+				// `renumberTasksInGroup` will then sort by this fractional order and re-assign integers.
+				draggedTaskCopy.order = targetTaskRef.order - 0.5;
 
-				dragged.order = target.order; // Temporarily assign target's order
+				// Update the main tasks array with the modified dragged task
+				tasks = tasks.map((t) => (t.id === taskIdToMove ? draggedTaskCopy : t));
 
-				// Shift orders of subsequent tasks
-				tasks = tasks.map((t) => {
-					if (t.groupId === targetGroupId && t.id !== taskIdToMove && t.order >= target.order) {
-						return { ...t, order: t.order + 1 };
-					}
-					return t;
-				});
-				// Place the dragged task
-				tasks = tasks.map((t) => (t.id === taskIdToMove ? { ...dragged, order: target.order } : t));
-
-				// Ensure all tasks are correctly ordered within their groups
-				renumberTasksInGroup(originalGroupId);
-				if (originalGroupId !== targetGroupId) {
-					renumberTasksInGroup(targetGroupId);
-				} else {
-					renumberTasksInGroup(targetGroupId); // Renumber the common group
+				// Renumber tasks in the affected group(s).
+				// `renumberTasksInGroup` will handle sorting by the new 'order' hints
+				// and then re-assign sequential integer orders (0, 1, 2...).
+				renumberTasksInGroup(newGroupId); // Renumber the group where the task was dropped/moved
+				if (originalGroupId !== newGroupId) {
+					// If the task moved between groups, renumber the original group as well
+					renumberTasksInGroup(originalGroupId);
 				}
+			} else {
+				console.warn(
+					`DropOnItem: Dragged or Target task not found. Dragged idx: ${draggedTaskIndex}, Target idx: ${targetTaskIndex}`
+				);
 			}
+		} else if (taskIdToMove === targetTaskId) {
+			// console.log("DropOnItem: Dropped task onto itself, no action.");
+		} else {
+			// console.warn(`DropOnItem: Invalid drop data. TaskID: ${taskIdToMove}, DraggedID: ${draggedTaskId}`);
 		}
-		draggedTaskId = null;
+		draggedTaskId = null; // Clear the dragged task ID after the operation
 	}
 
 	function handleDragEnd(): void {
@@ -363,6 +380,7 @@
 								tasks={tasksByGroupId(group.id)}
 								onToggleComplete={toggleTaskComplete}
 								onDelete={deleteTask}
+								onUpdateTask={handleUpdateTask}
 								onDragStartTask={handleDragStartTask}
 								onDropInGroup={handleDropOnGroup}
 								onDragOverItem={handleDragOverGroupOrItem}

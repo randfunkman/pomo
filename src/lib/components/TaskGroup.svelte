@@ -8,6 +8,7 @@
 		tasks,
 		onToggleComplete,
 		onDelete,
+		onUpdateTask,
 		onDragStartTask,
 		onDropInGroup,
 		onDragOverItem,
@@ -18,6 +19,7 @@
 		tasks: Task[]; // Tasks belonging to this group, already sorted by order
 		onToggleComplete: (taskId: string) => void;
 		onDelete: (taskId: string) => void;
+		onUpdateTask: (taskId: string, newDescription: string, newMinutes: number) => void;
 		onDragStartTask: (event: DragEvent, taskId: string) => void;
 		onDropInGroup: (event: DragEvent, targetGroupId: string) => void; // For dropping into an empty group or at the end
 		onDragOverItem: (event: DragEvent, targetTaskId: string) => void; // For reordering by dropping on an item
@@ -74,6 +76,7 @@
 				{task}
 				{onToggleComplete}
 				{onDelete}
+				{onUpdateTask}
 				onDragStart={onDragStartTask}
 				{onDragOverItem}
 				{onDropOnItem}
